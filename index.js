@@ -24,29 +24,33 @@ function decrypt(encrypted) {
 
   let t = Buffer.from(encrypted, "base64");   // Decode base64 encrypted data to a Hex Buffer.
 
-  let IV1  = t.slice(0,16);   // 32 Idhr jao. //First 32 bytes are IV.
-  let AAD1 = t.slice((t.length-16),t.length);  // 32 Udhr jao. //Last 32 Bytes are AAD.
+  let IV1  = t.slice(0,16);   // 16 Idhr jao. //First 16 bytes are IV.
+  let AAD1 = t.slice((t.length-16),t.length);  // 16 Udhr jao. //Last 16 Bytes are AAD.
   let ENC1 = t.slice(16,(t.length-16));  // Jo bache wo mere peeche aao.  //Rest is the actual encrypted data. Haha!
+	// let ENC1 = Buffer.from(ENC2.toString('hex'));
 
-	let y = [IV1, ENC1, AAD1];
-	let z = Buffer.concat(y);
-	console.log(typeof(z), z.length + "\n#\n");
+	// console.log("\nT should be 224.\nENC should be 192.\nIV and AAD to be 16 bytes.")
+	// console.log("t: " + t, t.length + "\n\n");
 
-  // console.log(" IV_DEC || Type || Length: " + typeof IV1  + " || " + IV1.toString('hex')  + " || " + IV1.length + "\n");
-  // console.log("AAD_DEC || Type || Length: " + typeof AAD1 + " || " + AAD1.toString('hex') + " || " + AAD1.length + "\n");
-  // console.log("ENC_DEC (without IV and AAD concat): " + typeof ENC1 + " || " + ENC1.length + '\n');
+	// console.log(ENC1, ENC1.length + "\n\n");
+	// let p = ENC1.toString('hex');
+	// let q = t.slice((180+16),(192+16));
+	// console.log("P: " + p, p.length);
+	// console.log("q: " + q, q.length);
+	// console.log("\n#Substring: \n" + p.substr(180,12) + "\n\n");
 
-  // let extra = t.slice(185,192);
-  // console.log("   T || Type || Length: " + typeof t + " || " + t.toString('hex') + " || " + t.length + "\n");
-  // console.log("EXTR || Type || Length: " + typeof extra + " || " + extra + " || " + extra.toString('hex') + " || " + extra.length + "\n");
+  console.log(" IV_DEC: " + typeof IV1  + " || " + IV1.toString('hex')  + " || " + IV1.length + "\n");
+  console.log("AAD_DEC: " + typeof AAD1 + " || " + AAD1.toString('hex') + " || " + AAD1.length + "\n");
+  console.log("ENC_DEC: " + typeof ENC1 + " || " + ENC1.toString() + " || " + ENC1.length + '\n');
+  // console.log("ENC_DEC: " + typeof ENC1 + " || " + ENC1.toString('hex') + " || " + ENC1.length + '\n');
 
   // The Magical Crypto Code
   let decipher = crypto.createDecipheriv(ALGO, KEY, IV1)
       decipher.setAuthTag(Buffer.from(AAD1));
-  let dec  = decipher.update(ENC1);
+  let dec  = decipher.update(ENC1, 'hex', 'ascii');
       dec += decipher.final();
 
-  return dec;
+  return dec.replace(/\0/g, '');
 }
 
 
@@ -55,66 +59,54 @@ function encrypt(data) {
 
   // let IV = Buffer.from(crypto.randomBytes(16));  // Set an IV of 16 Bytes. This should be dynamic, as it will be sent with the payload.
   let IV  = Buffer.from("fhK5nUB2L2KHzSBD2Dqy9w==", "base64"); // IV only for test purpose. In production, IV needs to be dynamic as mentioned above.
+	let plaintext = data.replace(/\0/g, '');	// Remove Nullbytes.
 
-  let plaintext = data.replace(/\0/g, '');  // Remove Nullbytes.
-
-	// START Debug Code for string length mis-match.
-  // console.log(data + " || " + data.length + "");
-  // console.log(plain_data + " || " + plain_data.length);
-  // let new1 = data.replace(/\0/g, '');
-  // console.log(new1 + " || " + new1.length);
-
-  // let i=0;
-  // for(const char of data) {
-  //   i++;
-  //   console.log(" " + char.toString('utf-8') + " - " + char.length + " - " + i);
-  // }
-	// END Debug Code for string length mis-match.
-
-	// START Debug Code for padding.
-  // let plainLength = plaintext.toString().length;
-
-  // let remainder = plainLength % 16;
-  // var pad = "";
-  // if (remainder != 0) {
-  //   plainLength += 16 - remainder;
-  //   pad = Buffer.alloc(16-remainder);
-  // }
-
-  // var plain = Buffer.from(plaintext + pad);
-  // console.log(pad.length + "\n\n");
-  // console.log(plain.length + "\n\n");
-	// END Code for paddinG.
-
-	let plain = new TextEncoder().encode(plaintext);
+  let plainLength = plaintext.toString().length;
+  let remainder = plainLength % 16;
+  var pad = "%00";
+  if (remainder != 0) {
+    plainLength += 16 - remainder;
+    pad = Buffer.alloc(16-remainder);
+  }
+  let plain = Buffer.from(plaintext + pad);
 
   // The Magical Crypto Code
   let cipher = crypto.createCipheriv(ALGO, KEY, IV);
-  let ENC = Buffer.from(cipher.update(plain)); // Set encryption params. Auto-padding is default.
-      ENC += cipher.final('utf8'); // Perform actual encryption and return an Array Buffer.
+  let ENC = Buffer.from(cipher.update(plain, 'utf8', 'ascii')); // Set encryption params. Auto-padding is default.
+      ENC += cipher.final(); // Perform actual encryption and return an Array Buffer.
 
   let AAD = cipher.getAuthTag(); // Get Auth Tag. Returns a Buffer.
 
-	let z_buffer = [IV, ENC, AAD];
-  let finalText = Buffer.concat(z_buffer);  // Concat the data
-  let final = Buffer.from(finalText.toString("base64"));   //Encode the data in Base64
+	// let u = Buffer.from(ENC, 'utf8');
+	// let p = u.toString('hex');
+	// console.log(typeof(ENC), ENC.length, ENC, "\n");
+	// console.log(typeof(p), p.length, p, "\n");
+	// console.log(typeof(u), u.length);
 
-	console.log(finalText.length, typeof(finalText));
-	console.log(final.length, typeof(final) + "\n\n");
+	let u = Buffer.from(ENC);
 
-  // console.log(" IV_ORG || Type || Length: " + typeof IV  + " || " + IV.toString('hex')  + " || " + IV.length + "\n");
-  // console.log("AAD_ORG || Type || Length: " + typeof AAD + " || " + AAD.toString('hex') + " || " + AAD.length + "\n");
-  // console.log("ENC_ORG (without IV and AAD concat): " + typeof ENC + " || " + ENC.length + '\n');
-  // console.log("AAD || Type || Length: " + typeof AAD + " || " + s2B(AAD.toString('utf-8')) + " || " + AAD.length + "\n");
-  // console.log("FNT || Type || Length: " + finalText + " || " + finalText.length + "\n\n");
+	let z_buffer = [IV, u, AAD];
+  let finalBuffer = Buffer.concat(z_buffer);  // Concat the data
+  let final = finalBuffer.toString("base64");   //Encode the data in Base64
 
-  let r = Buffer.from(final, "base64");   // Decode base64 encrypted data to a Hex Buffer.
-  let IV1  = r.slice(0,16);   // 32 Idhr jao. //First 32 bytes are IV.
-  let AAD1 = r.slice((r.length-16),r.length);  // 32 Udhr jao. //Last 32 Bytes are AAD.
-  let ENC1 = r.slice(16,(r.length-16));  // Jo bache wo mere peeche aao.  //Rest is the actual encrypted data. Haha!
-  console.log(" IV1_ENC || Type || Length: " + typeof IV1  + " || " + IV1.toString('hex')  + " || " + IV1.length + "\n");
-  console.log("AAD1_ENC || Type || Length: " + typeof AAD1 + " || " + AAD1.toString('hex') + " || " + AAD1.length + "\n");
-  console.log("ENC1_ENC (without IV and AAD concat): " + typeof ENC1 + " || " + ENC1.toString('hex').length + '\n');
+	console.log("###");
+	console.log(finalBuffer.length, typeof(finalBuffer));
+	console.log(final, final.length, typeof(final));
+	console.log("###");
+	console.log(u.length);
+	console.log(enc_data.length);
+	console.log("###");
+
+  console.log(" IV_ORG: " + typeof IV  + " || " + IV.toString('hex')  + " || " + IV.length + "\n");
+  console.log("AAD_ORG: " + typeof AAD + " || " + AAD.toString('hex') + " || " + AAD.length + "\n");
+  console.log("ENC_ENC: " + typeof ENC + " || " + ENC.toString().length + '\n');
+
+  // let r = Buffer.from(final, "base64");   // Decode base64 encrypted data to a Hex Buffer.
+  // let IV1  = r.slice(0,16);   // 32 Idhr jao. //First 32 bytes are IV.
+  // let AAD1 = r.slice((r.length-16),r.length);  // 32 Udhr jao. //Last 32 Bytes are AAD.
+  // let ENC1 = r.slice(16,(r.length-16));  // Jo bache wo mere peeche aao.  //Rest is the actual encrypted data. Haha!
+  // console.log(" IV1_ENC || Type || Length: " + typeof IV1  + " || " + IV1.toString('hex')  + " || " + IV1.length + "\n");
+  // console.log("AAD1_ENC || Type || Length: " + typeof AAD1 + " || " + AAD1.toString('hex') + " || " + AAD1.length + "\n");
 
 
   return final;
@@ -124,16 +116,16 @@ function encrypt(data) {
 
 // Call Functions and Print Results
 var dec_data = decrypt(enc_data);
-// console.log(dec_data.toString() + " || " + dec_data.toString().length + "\n");
+console.log(dec_data.toString() + " || " + dec_data.toString().length + "\n");
 
 console.log("###################\n");
 
 var enc_data1 = encrypt(dec_data);
-console.log(enc_data1.toString() + "\n\n");
+// console.log(enc_data1.toString() + "\n\n");
 
-// console.log("###################\n");
+console.log("###################\n");
 
-// var dec_data1 = decrypt(enc_data1);
+var dec_data1 = decrypt(enc_data1);
 // console.log(dec_data1.toString() + "\n\n");
 
 //## Console Output
