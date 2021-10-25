@@ -13,7 +13,7 @@ const ALGO = 'aes-256-gcm';
 // Base64 representation of 'ANTS_BLAIR.key' read as a Buffer.
 const KEY = Buffer.from("eRiIC19oFfg0BOKsMZaZa67eS8QkKwCpE7I0yTu4RVM=", "base64");
 
-//Expected String
+//Expected Enc String
 var enc_data = "fhK5nUB2L2KHzSBD2Dqy98V6NuAeSvQGsRdwv2K+rwm+Z74wYmTb3DTnt+hg0Tb6RZXGHRU07yFGQ45XZfyHR4evqLG5NFeLtJ/8jkP25dzE6XzeuklTeUS01FSWhC3ph/pPiXK5L3MSS6Fq2HCFKfAK1AS6yETu4zNtTuEeyZBSOS5eDjrbroIVapu3ZcNSVSUK9K8iIzUNuRoBWfrXeT9LfQCqHXFKPSMLP38kVGqj3bzPnhkaBSEku5BqoAS+Zlxyn1L3TBpWs+F3WOtFnGGWW1ODKbUrFhzK10RI9b4=";
 
 //Plain-text Data
@@ -32,16 +32,13 @@ function decrypt(encrypted) {
   let ENC2 = t.slice(16,(t.length-16));  // Jo bache wo mere peeche aao.  //Rest is the actual encrypted data. Haha!
 	let ENC1 = Buffer.from(ENC2).toString('hex');
 
-  console.log(" IV_DEC: " + typeof IV1  + " || " + IV1.toString('hex')  + " || " + IV1.length + "\n");
+  console.log(" IV_DEC: " + typeof IV1  + " || " + IV1.toString('hex')  + " || " + IV1.length);
   console.log("AAD_DEC: " + typeof AAD1 + " || " + AAD1.toString('hex') + " || " + AAD1.length + "\n");
-  console.log("ENC_DEC: " + ENC1 + " || " + ENC1.length + '\n');
-
-  AAD2 = AAD1.toString('hex');
-  AAD3 = Buffer.from(AAD2, 'hex');
+  // console.log("ENC_DEC: " + ENC1 + " || " + ENC1.length + '\n');
 
   // The Magical Crypto Code
   let decipher = crypto.createDecipheriv(ALGO, KEY, IV1)
-      decipher.setAuthTag(AAD3, 'hex');
+      decipher.setAuthTag(AAD1);
   let dec  = decipher.update(ENC1, 'hex');
       dec += decipher.final('ascii');
 
@@ -56,6 +53,7 @@ function encrypt(data) {
   let IV  = Buffer.from("fhK5nUB2L2KHzSBD2Dqy9w==", "base64"); // IV only for test purpose. In production, IV needs to be dynamic as mentioned above.
 	let plaintext = data.replace(/\0/g, '');	// Remove Nullbytes.
 
+  // Code to pad the plaintext before encryption with nullbyts.
   let plainLength = plaintext.toString().length;
   let remainder = plainLength % 16;
   var pad = "";
@@ -67,34 +65,23 @@ function encrypt(data) {
 
   // The Magical Crypto Code
   let cipher = crypto.createCipheriv(ALGO, KEY, IV);
-  let ENC = Buffer.from(cipher.update(plain, 'utf8', 'latin1')); // Set encryption params. Auto-padding is default.
+  let ENC = Buffer.from(cipher.update(plain, 'utf8', 'latin1')); // Set encryption params. Padding has been done above. 'latin1' encoding to be used to supprot java decryption.
       ENC += cipher.final(); // Perform actual encryption and return an Array Buffer.
 
   let AAD = cipher.getAuthTag(); // Get Auth Tag. Returns a Buffer.
 
-	let u = Buffer.from(ENC, 'latin1');
-
-	let z_buffer = [IV, u, AAD];
-  let finalBuffer = Buffer.concat(z_buffer);  // Concat the data
+	let encBuffer = Buffer.from(ENC, 'latin1'); // 
+	let concBuffer = [IV, encBuffer, AAD];
+  let finalBuffer = Buffer.concat(concBuffer);  // Concat the data
   let final = finalBuffer.toString("base64");   //Encode the data in Base64
 
-	// console.log("###");
-	// console.log("###");
-	// console.log(u.toString('hex') + " || " + u.length);
-	// console.log("###");
-
-  // let cipher1 = crypto.createCipheriv(ALGO, KEY, IV);
-	// let final1 = Buffer.from(cipher1.update(plain, 'utf8', 'ascii'));
-	//     final1 += cipher1.final();
-
-  console.log(" IV_ORG: " + typeof IV  + " || " + IV.toString('hex')  + " || " + IV.length + "\n");
+  console.log(" IV_ORG: " + typeof IV  + " || " + IV.toString('hex')  + " || " + IV.length);
   console.log("AAD_ORG: " + typeof AAD + " || " + AAD.toString('hex') + " || " + AAD.length + "\n");
   // console.log("ENC_ENC: " + final.toString() + " || " + final.toString().length + '\n');
   // console.log("ENC_ENC: " + final1.toString() + " || " + final1.toString().length + '\n');
 
   return final;
 }
-
 
 
 // Call Functions and Print Results
@@ -110,6 +97,4 @@ console.log("###################\n");
 
 var dec_data1 = decrypt(enc_data1);
 console.log(dec_data1.toString() + " || " + dec_data1.toString().length + "\n");
-
-//## Console Output
 
